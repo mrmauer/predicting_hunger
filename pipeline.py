@@ -1,12 +1,13 @@
-# A library for streamlining ML processes
-# by Matthew Mauer
-# last editted 2020-05-10
-
 '''
+A library for streamlining ML processes
+by Matthew Mauer
+last editted 2020-05-10
+
+
     EDITS TO COME:
+        - best_model functionality for learner grid search
         - more exception handling!!!
-        - more Grid Parameters in SupervisedLearner
-        - an UnsupervervisedLearner...
+        - Unsupervised ML
 '''
 
 import pandas as pd
@@ -49,19 +50,18 @@ def clean_events(df):
 
     return df
 
-def impute(df):
-
-    pass
-
-
-
-
+def model_eval(model, Xtest, Ytest):
+    # r2 = model.score
+    Ypred = model.predict(Xtest)
+    mse = mean_squared_error(Ytest, Ypred)
+    mae = mean_absolute_error(Ytest, Ypred)
+    print(f'MSE: {mse}\nMAE: {mae}')
 
 class LongitudinalLearner():
     '''
 
     '''
-    def __init(self, models={}):
+    def __init__(self, models={}):
         self.models = models
 
     @property
@@ -84,12 +84,13 @@ class LongitudinalLearner():
         self.training_data = data[mask]
         self.test_data = data[~mask]
 
-    def inputs_outputs(self, features=[], target=''):
+    def inputs_outputs(self, features=[], target='', dirty_features=[]):
         '''
         Grab label names for features and target variable.
         '''
         self.features = features
         self.target = target
+        self.dirty_features = dirty_features
     
     def grid_search(self, GRID={}, num_cvs=4):
         '''
@@ -132,14 +133,16 @@ class LongitudinalLearner():
                     Ytrain = Y[cv]
                     Yval = Y[~cv]
 
+                    self.impute(Xtrain, Xval)
+
                     model.fit(Xtrain, Ytrain)
                     
-                    Ypred = model.predict(Xtest)
+                    Ypred = model.predict(Xval)
                     
                     row = {'model':model_key}
                     row.update(params)
 
-                    mae, mse, r2 = self.eval(Xtrain, Ytrain, Ytest, Ypred, 
+                    mae, mse, r2 = self.eval(Xtrain, Ytrain, Yval, Ypred, 
                                              model=model, output=False)
                     row.update({'CV_years': cv_index, 
                                 'MAE': mae, 
@@ -168,7 +171,7 @@ class LongitudinalLearner():
         return mask
 
 
-    def eval(Xtrain, Ytrain, Ytest, Ypred, model=None, output=False, visual=False):
+    def eval(self, Xtrain, Ytrain, Ytest, Ypred, model=None, output=False, visual=False):
         '''
         Evaluate a regression model and return metrics.
         '''
@@ -182,6 +185,19 @@ class LongitudinalLearner():
             print("R-squared: %.2f \n" % r2)
         
         return (mae, mse, r2)
+
+    def impute(self, train, test):
+        '''
+        Fill NaN values with the training sets column median for all 
+        or select continuous variables
+        '''
+        fill = [train[col].median() for col in self.dirty_features]
+
+        for i, col in enumerate(self.dirty_features):
+            train[col].fillna(value=fill[i], inplace=True)
+            test[col].fillna(value=fill[i], inplace=True)
+
+        return 
 
       
 
