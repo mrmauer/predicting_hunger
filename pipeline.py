@@ -5,6 +5,7 @@ last editted 2020-05-10
 
 
     EDITS TO COME:
+        - FIX TIME-SERIES NESTED CROSS VALIDATION
         - best_model functionality for learner grid search
         - more exception handling!!!
         - Unsupervised ML
@@ -33,6 +34,7 @@ def read(path):
     read in and display the data
     '''
     df = pd.read_csv(path)
+    df = df.drop(columns=['Unnamed: 2', 'ADMIN0.1', 'ADMIN1.1'])
     rown, coln = df.shape
     print(f'There are {rown} rows and {coln} columns in the data set.')
     return df
@@ -50,16 +52,90 @@ def clean_events(df):
 
     return df
 
+def five_way_split(data, features=[], target='', year=2018, grouping=''):
+    '''
+    Drop rows that do not contain the target vairable.
+    Split the data on the input year (input year included in test data). 
+    Return test/train features, targets, and groups used for Group CV.
+    '''
+    data = data.dropna(axis=0, subset=[target])
+    mask = data.year < 2018
+    train = data[mask]
+    test = data[~mask]
+
+    groups = train[grouping]
+    Xtrain = train[features]
+    Xtest = test[features]
+    Ytrain = train[target]
+    Ytest = test[target]
+
+    return Xtrain, Xtest, Ytrain, Ytest, groups
+
+def _convert_repeat_regions(row, repeat_regions=[]):
+    '''
+    Helper function to be applied in unique_regions.
+    '''
+    if row['ADMIN1'] in repeat_regions:
+        row['ADMIN1'] = '%s (%s)' % (row['ADMIN1'], row['ADMIN0'])
+    return row
+
+def unique_regions(data):
+    '''
+    Identify all region (ADMIN1) names that are repeated across countries.
+    Update these region name to include the country name.
+    e.g. 'Northern' -> 'Northern (Kenya)'
+    '''
+    max_occurrences = len(data.year.unique()) * 12
+
+    region_counts = data.ADMIN1.value_counts()
+    repeat_regions = list(region_counts[region_counts > max_occurrences].index)
+
+    data = data.apply(lambda row: _convert_repeat_regions(row,repeat_regions),
+                         axis=1)
+    return data
+
+
 def model_eval(model, Xtest, Ytest):
     # r2 = model.score
     Ypred = model.predict(Xtest)
     mse = mean_squared_error(Ytest, Ypred)
     mae = mean_absolute_error(Ytest, Ypred)
-    print(f'MSE: {mse}\nMAE: {mae}')
+    target_std = Ytest.describe()['std']
+    print(f'''
+        MSE: {mse}
+        MAE: {mae}
+        For a target variable with Variance: {target_std**2}
+        ''')
+
+def feature_importance(model, labels=[], type='linear'):
+    '''
+    Accept a model a list of labels for the features that correspond to the 
+    column order in the feature matrix used for training.
+    Return a bar plot of either feature importance (for a tree-based model),
+    or coefficients for a linear model.
+    '''
+    if type=='tree':
+        importances = model.feature_importances_
+    elif type=='linear':
+        importances = model.coef_
+
+    # Sort in descending order
+    indices = np.argsort(importances)[::-1]
+
+    # Sort the labels in a corresponding fashion
+    names = [labels[i] for i in indices]
+
+    plt.figure(figsize=[10,6])
+    plt.title('Feature Importance/Weights')
+    plt.bar(range(len(labels)), importances[indices])
+    plt.xticks(range(len(labels)), names, rotation=90)
+    plt.show()
 
 class LongitudinalLearner():
     '''
-
+    A supervised learning object designed to handle longitudinal data.
+    Performs a grid search performing time-series nest cross validation.
+    ERROR: (pandas) copying on a slice... May alter results of grid search...
     '''
     def __init__(self, models={}):
         self.models = models
