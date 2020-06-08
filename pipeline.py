@@ -5,7 +5,7 @@ last editted 2020-05-10
 
 
     EDITS TO COME:
-        - FIX TIME-SERIES NESTED CROSS VALIDATION
+        - FIX TIME-SERIES NESTED CROSS validation
         - best_model functionality for learner grid search
         - more exception handling!!!
         - Unsupervised ML
@@ -41,7 +41,8 @@ def read(path):
 
 def clean_events(df):
     '''
-    Convert NaN values in event data to 0
+    Convert NaN values in event data to 0.
+    Convert all event data to log scale.
     '''
     events = ['battle_cnt', 'protest_cnt',
        'riot_cnt', 'explosion_cnt', 'violence_on_civs_cnt',
@@ -49,6 +50,8 @@ def clean_events(df):
        'violence_on_civs_fatal']
 
     df[events] = df[events].fillna(value=0)
+
+    df[events] = df[events].apply(lambda x: np.log(x + 1))
 
     return df
 
