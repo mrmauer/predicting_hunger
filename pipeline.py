@@ -17,7 +17,10 @@ import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn import linear_model
-from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, \
+                            accuracy_score, precision_score, recall_score, \
+                            f1_score, plot_confusion_matrix, plot_roc_curve, \
+                            plot_precision_recall_curve
 from sklearn.preprocessing import StandardScaler, \
                                   PolynomialFeatures, OneHotEncoder
 from sklearn.model_selection import train_test_split, TimeSeriesSplit
@@ -55,11 +58,14 @@ def clean_events(df):
 
     return df
 
-def five_way_split(data, features=[], target='', year=2018, grouping=''):
+def five_way_split(data, features=[], target='', year=2018, grouping='',
+                   binary=False, binary_threshold=0):
     '''
     Drop rows that do not contain the target vairable.
     Split the data on the input year (input year included in test data). 
     Return test/train features, targets, and groups used for Group CV.
+    If a binary outcome is requested, convert the targets to {0,1} based
+    on some input threshold.
     '''
     data = data.dropna(axis=0, subset=[target])
     mask = data.year < 2018
@@ -69,8 +75,13 @@ def five_way_split(data, features=[], target='', year=2018, grouping=''):
     groups = train[grouping]
     Xtrain = train[features]
     Xtest = test[features]
-    Ytrain = train[target]
-    Ytest = test[target]
+
+    if binary:
+        Ytrain = train[target].map(lambda x: int(x > binary_threshold))
+        Ytest = test[target].map(lambda x: int(x > binary_threshold))
+    else:
+        Ytrain = train[target]
+        Ytest = test[target]
 
     return Xtrain, Xtest, Ytrain, Ytest, groups
 
@@ -98,17 +109,33 @@ def unique_regions(data):
     return data
 
 
-def model_eval(model, Xtest, Ytest):
-    # r2 = model.score
+def model_eval(model, Xtest, Ytest, model_type='regression'):
+    '''
+    Evaluate several metrics for the model depending on regression or 
+    classification. Print.
+    '''
     Ypred = model.predict(Xtest)
-    mse = mean_squared_error(Ytest, Ypred)
-    mae = mean_absolute_error(Ytest, Ypred)
-    target_std = Ytest.describe()['std']
-    print(f'''
-        MSE: {mse}
-        MAE: {mae}
-        For a target variable with Variance: {target_std**2}
-        ''')
+
+    if model_type == 'regression':
+        mse = mean_squared_error(Ytest, Ypred)
+        mae = mean_absolute_error(Ytest, Ypred)
+        target_std = Ytest.describe()['std']
+        print(f'''
+            MSE: {mse}
+            MAE: {mae}
+            For a target variable with Variance: {target_std**2}
+            ''')
+    elif model_type == 'classification':
+        accuracy = accuracy_score(Ytest, Ypred)
+        precision = precision_score(Ytest, Ypred)
+        recall = recall_score(Ytest, Ypred)
+        F1 = f1_score(Ytest, Ypred)
+        print("Accuracy:\t{}\nPrecision:\t{}\nRecall:\t\t{}\nF1 Score:\t{}\n"
+                    .format(accuracy, precision, recall, F1))
+        plot_confusion_matrix(model, Xtest, Ytest)
+        plot_precision_recall_curve(model, Xtest, Ytest)
+        plot_roc_curve(model, Xtest, Ytest)
+
 
 def feature_importance(model, labels=[], type='linear'):
     '''
