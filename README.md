@@ -10,7 +10,7 @@ The order in which the notebooks were created and ideally should be run is as fo
 1. create_scores.ipynb (Creates hunger scores as column from FEWS shape data files)
 2. make_regions.ipynb (Creates geodataframes for Horn of Africa sub-regions)
 3. conflict/acled_wrangling.ipynb (Conflict data for regions in the HoA)
-4. create_targets/create_targets.ipynb (Creates targets with 1,2 and 3 month offsets)
+4. create_targets/create_targets.ipynb (Reshapes final dataframe with 1,2 and 3 month offsets of target variable)
 5. food_prices/wfp_wrangling.ipynb (Food price data cleaned into a dataframe)
 6. population/population_wrangling.ipynb (demographic data from WB and govts)
 7. weather/Weather Data.ipynb (Weather data from GHCN)
